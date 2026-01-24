@@ -1,0 +1,24 @@
+# Snowflake to S3 Export Pipeline Configuration
+# Add your tables below
+
+exports:
+  - table: ORDERS
+    s3_path: exports/orders/data.parquet
+    file_type: parquet
+    query: null  # null = export full table, or specify custom SQL
+
+  - table: CUSTOMERS
+    s3_path: exports/customers/data.csv
+    file_type: csv
+    query: null
+
+  - table: PRODUCTS
+    s3_path: exports/products/data.json
+    file_type: json
+    query: null
+
+# Example with custom query:
+#  - table: RECENT_ORDERS
+#    s3_path: exports/recent_orders/data.parquet
+#    file_type: parquet
+#    query: "SELECT * FROM ORDERS WHERE created_at >= DATEADD(day, -7, CURRENT_DATE())"
