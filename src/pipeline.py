@@ -1,86 +1,80 @@
 import yaml
-import argparse
-from datetime import datetime
-from s3_connector import S3Connector
+import logging
+from pathlib import Path
 from snowflake_connector import SnowflakeConnector
+from s3_exporter import S3Exporter
+
+PROJECT_ROOT = Path(__file__).parent.parent
+DEFAULT_CONFIG = PROJECT_ROOT / "config" / "export_tables.yaml"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
-def load_config(config_path: str) -> dict:
+def load_config(config_path: str | Path = None) -> dict:
+    if config_path is None:
+        config_path = DEFAULT_CONFIG
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
 
-def run_pipeline(config_path: str, dry_run: bool = False):
+def run_export(export_config: dict, snowflake: SnowflakeConnector, s3: S3Exporter) -> str:
+    table = export_config["table"]
+    s3_path = export_config["s3_path"]
+    file_type = export_config.get("file_type", "parquet")
+    query = export_config.get("query")
+
+    if query is None:
+        query = f"SELECT * FROM {table}"
+
+    logger.info(f"Fetching data for {table}")
+    df = snowflake.fetch_dataframe(query)
+    logger.info(f"Fetched {len(df)} rows")
+
+    logger.info(f"Exporting to {s3_path}")
+    result = s3.export_dataframe(df, s3_path, file_type)
+    logger.info(f"Export complete: {result}")
+
+    return result
+
+
+def run_pipeline(config_path: str | Path = None):
     config = load_config(config_path)
     exports = config.get("exports", [])
 
     if not exports:
-        print("No exports defined in config")
+        logger.warning("No exports configured")
         return
 
-    print(f"Pipeline started at {datetime.now().isoformat()}")
-    print(f"Found {len(exports)} table(s) to export")
-    print("-" * 50)
-
-    s3 = S3Connector()
     snowflake = SnowflakeConnector()
-    snowflake.connect()
+    s3 = S3Exporter()
 
-    results = []
+    try:
+        logger.info("Connecting to Snowflake")
+        snowflake.connect()
 
-    for export in exports:
-        table = export["table"]
-        s3_path = export["s3_path"]
-        file_type = export.get("file_type", "csv")
-        query = export.get("query") or f"SELECT * FROM {table}"
+        results = []
+        for export_config in exports:
+            try:
+                result = run_export(export_config, snowflake, s3)
+                results.append({"table": export_config["table"], "status": "success", "path": result})
+            except Exception as e:
+                logger.error(f"Failed to export {export_config['table']}: {e}")
+                results.append({"table": export_config["table"], "status": "failed", "error": str(e)})
 
-        print(f"\nExporting: {table}")
-        print(f"  Query: {query[:80]}{'...' if len(query) > 80 else ''}")
-        print(f"  Destination: s3://{s3.bucket}/{s3_path}")
-        print(f"  Format: {file_type}")
+        logger.info("Pipeline complete")
+        for r in results:
+            status = "✓" if r["status"] == "success" else "✗"
+            logger.info(f"  {status} {r['table']}")
 
-        if dry_run:
-            print("  [DRY RUN] Skipping actual export")
-            results.append({"table": table, "status": "skipped (dry run)"})
-            continue
+        return results
 
-        try:
-            df = snowflake.fetch_dataframe(query)
-            row_count = len(df)
-
-            if file_type == "csv":
-                s3.write_csv(df, s3_path)
-            elif file_type == "parquet":
-                s3.write_parquet(df, s3_path)
-            elif file_type == "json":
-                s3.write_json(df, s3_path)
-
-            print(f"  Exported {row_count} rows")
-            results.append({"table": table, "status": "success", "rows": row_count})
-
-        except Exception as e:
-            print(f"  ERROR: {e}")
-            results.append({"table": table, "status": "failed", "error": str(e)})
-
-    snowflake.disconnect()
-
-    print("\n" + "=" * 50)
-    print("Pipeline Summary")
-    print("=" * 50)
-    for r in results:
-        status = r["status"]
-        rows = r.get("rows", "-")
-        print(f"  {r['table']}: {status} ({rows} rows)")
-
-    print(f"\nPipeline completed at {datetime.now().isoformat()}")
+    finally:
+        snowflake.disconnect()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run Snowflake to S3 export pipeline")
-    parser.add_argument("--config", default="config/export_tables.yaml",
-                        help="Path to export config file")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Show what would be exported without actually exporting")
-
-    args = parser.parse_args()
-    run_pipeline(args.config, args.dry_run)
+    run_pipeline()

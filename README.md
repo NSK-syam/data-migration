@@ -74,6 +74,36 @@ exports:
     query: "SELECT * FROM ORDERS WHERE created_at >= DATEADD(day, -7, CURRENT_DATE())"
 ```
 
+## Usage
+
+Run the pipeline:
+
+```bash
+cd src
+python pipeline.py
+```
+
+Or with a custom config file:
+
+```python
+from pipeline import run_pipeline
+run_pipeline("path/to/custom_config.yaml")
+```
+
+## Testing
+
+Test with sample data (no Snowflake connection required):
+
+```bash
+cd src
+
+# Generate local test files (parquet, csv)
+python test_pipeline.py
+
+# Test S3 upload (requires AWS credentials in .env)
+python test_pipeline.py --s3
+```
+
 ## Project Structure
 
 ```
@@ -83,7 +113,9 @@ data-migration/
 ├── src/
 │   ├── config.py             # Environment configuration
 │   ├── snowflake_connector.py # Snowflake connection handler
-│   └── s3_exporter.py        # S3 upload handler
+│   ├── s3_exporter.py        # S3 upload handler
+│   ├── pipeline.py           # Main pipeline orchestrator
+│   └── test_pipeline.py      # Test with sample data
 ├── .env.example              # Environment template
 ├── requirements.txt          # Python dependencies
 └── README.md
