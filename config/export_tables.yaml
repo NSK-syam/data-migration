@@ -4,17 +4,17 @@ exports:
     file_type: parquet
     query: null  # null = export full table
 
-  - table: CUSTOMERS
-    s3_path: exports/customers/data.parquet
+  - table: CUSTOMER
+    s3_path: exports/customer/data.parquet
     file_type: parquet
     query: null
 
   - table: RECENT_ORDERS
     s3_path: exports/recent_orders/data.parquet
     file_type: parquet
-    query: "SELECT * FROM ORDERS WHERE created_at >= DATEADD(day, -7, CURRENT_DATE())"
+    query: "SELECT * FROM ORDERS WHERE O_ORDERDATE >= DATEADD(day, -7, CURRENT_DATE())"
 
   - table: ORDER_SUMMARY
     s3_path: exports/order_summary/data.csv
     file_type: csv
-    query: "SELECT customer_id, COUNT(*) as order_count, SUM(total) as total_spent FROM ORDERS GROUP BY customer_id"
+    query: "SELECT O_CUSTKEY, COUNT(*) as ORDER_COUNT, SUM(O_TOTALPRICE) as TOTAL_SPENT FROM ORDERS GROUP BY O_CUSTKEY"

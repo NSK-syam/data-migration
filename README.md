@@ -68,11 +68,23 @@ exports:
     file_type: parquet
     query: null  # null = export full table
 
+  - table: CUSTOMER
+    s3_path: exports/customer/data.parquet
+    file_type: parquet
+    query: null
+
   - table: RECENT_ORDERS
     s3_path: exports/recent_orders/data.parquet
     file_type: parquet
-    query: "SELECT * FROM ORDERS WHERE created_at >= DATEADD(day, -7, CURRENT_DATE())"
+    query: "SELECT * FROM ORDERS WHERE O_ORDERDATE >= DATEADD(day, -7, CURRENT_DATE())"
+
+  - table: ORDER_SUMMARY
+    s3_path: exports/order_summary/data.csv
+    file_type: csv
+    query: "SELECT O_CUSTKEY, COUNT(*) as ORDER_COUNT, SUM(O_TOTALPRICE) as TOTAL_SPENT FROM ORDERS GROUP BY O_CUSTKEY"
 ```
+
+The example above uses the Snowflake sample database `SNOWFLAKE_SAMPLE_DATA.TPCH_SF1`.
 
 ## Usage
 
