@@ -82,7 +82,8 @@ data-migration/
 │   └── export_tables.yaml    # Export configuration
 ├── src/
 │   ├── config.py             # Environment configuration
-│   └── snowflake_connector.py # Snowflake connection handler
+│   ├── snowflake_connector.py # Snowflake connection handler
+│   └── s3_exporter.py        # S3 upload handler
 ├── .env.example              # Environment template
 ├── requirements.txt          # Python dependencies
 └── README.md
